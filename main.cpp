@@ -24,50 +24,53 @@ int sumMat(Mat img, vector<Point> pts, int channel)
 class Edge
 {
 private:
-	vector<vector<Point>> pp;	//pairs of points on edge
-	int rf, rt;	//this is an edge between regins of rf and rt
+	int width = EDGE_WIDTH;
+	vector<vector<Point>> fpts;	//points on from-side of the edge
+	vector<vector<Point>> tpts;	//points on to-side of the edge
+	int rf, rt;	//this is an edge between regins of from-region and to-region
 public:
-	void switchPoints(){
-		for (int i = 0; i < pp.size(); i++)
-		{
-			Point p = pp[i][0];
-			pp[i][0] = pp[i][1];
-			pp[i][1] = p;
-		}
+	int getFromRegionNumber(){
+		return rf;
 	}
-	void addPoints(Point pf, Point pt)
+	int getToRegionNumber(){
+		return rt;
+	}
+	/*void switchPoints(){
+	for (int i = 0; i < pp.size(); i++)
 	{
-		//去重
-		for (int i = 0; i < pp.size(); i++)
-		{
-			Point f = pp[i][0];
-			Point t = pp[i][1];
-			if (f.x == pf.x && f.y == pf.y)
-			{
-				if (t.x == pt.x && t.y == pt.y)
-					return;
-			}
-		}
-		vector<Point> p;
-		p.push_back(pf);
-		p.push_back(pt);
-		pp.push_back(p);
+	Point p = pp[i][0];
+	pp[i][0] = pp[i][1];
+	pp[i][1] = p;
+	}
+	}*/
+	void addPoints(vector<Point> pf, vector<Point> pt)
+	{
+		////去重
+		//for (int i = 0; i < pp.size(); i++)
+		//{
+		//	Point f = pp[i][0];
+		//	Point t = pp[i][1];
+		//	if (f.x == pf.x && f.y == pf.y)
+		//	{
+		//		if (t.x == pt.x && t.y == pt.y)
+		//			return;
+		//	}
+		//}
+		//vector<Point> p;
+		fpts.push_back(pf);
+		tpts.push_back(pt);
 	}
 	void setRegions(int f, int t)
 	{
 		rf = f;
 		rt = t;
 	}
-	vector<int> getRegionNumbers()
+	vector<vector<Point>> getFromRegionPoints()
 	{
-		vector<int> rs;
-		rs.push_back(rf);
-		rs.push_back(rt);
-		return rs;
+		return fpts;
 	}
-	vector<vector<Point>> getPoints()
-	{
-		return pp;
+	vector<vector<Point>> getToRegionPoints(){
+		return tpts;
 	}
 };
 class Region
@@ -257,48 +260,77 @@ public:
 
 void addToEdge(Point p, Mat region_map, vector<Edge> &edges)
 {
-	int x = p.x;
-	int y = p.y;
+	int x0 = p.x;
+	int y0 = p.y;
 	for (int dx = -1; dx < 2; dx++)
 	{
 		for (int dy = -1; dy < 2; dy++)
 		{
-			int ex = x + dx;
-			int ey = y + dy;
-			if (ex < 0)
-				ex = 0;
-			if (ex > region_map.cols - 1)
-				ex = region_map.cols - 1;
-			if (ey < 0)
-				ey = 0;
-			if (ey > region_map.rows - 1)
-				ey = region_map.rows - 1;
-			int t = (int)region_map.at<uchar>(ey, ex);
-			int f = (int)region_map.at<uchar>(y, x);
+			int ex0 = x0 + dx;
+			int ey0 = y0 + dy;
+			if (ex0 < 0)
+				ex0 = 0;
+			if (ex0 > region_map.cols - 1)
+				ex0 = region_map.cols - 1;
+			if (ey0 < 0)
+				ey0 = 0;
+			if (ey0 > region_map.rows - 1)
+				ey0 = region_map.rows - 1;
+			int t = (int)region_map.at<uchar>(ey0, ex0);
+			int f = (int)region_map.at<uchar>(y0, x0);
 			if (f != t)
 			{
 				//相邻两个点属于不同region
-				//遍历Edge，把两个点添加到对应region间的edge去
+				//遍历Edge，把两个点添加到对应region间的edge去--0406更新，不止两个点，还包括这两个点（面向edge）身后2个点
 				//如果没有此edge，则建立新的edge
 
 				//遍历
-				vector<int> ft;
+				vector<Point> fp; //points of from-side
+				int x1 = x0 - dx;
+				int y1 = y0 - dy;
+				int x2 = x0 - 2 * dx;
+				int y2 = y0 - 2 * dy;
+
+				x1 = (x1 < 0 || x1 > region_map.cols - 1) ? x0 : x1;
+				x2 = (x2 < 0 || x2 > region_map.cols - 1) ? x1 : x2;
+				y1 = (y1 < 0 || y1 > region_map.rows - 1) ? y0 : y1;
+				y2 = (y2 < 0 || y2 > region_map.rows - 1) ? y1 : y2;
+
+				fp.push_back(Point(x0, y0));
+				fp.push_back(Point(x1, y1));
+				fp.push_back(Point(x2, y2));
+
+				vector<Point> tp; //points of to-side
+				int ex1 = ex0 + dx;
+				int ey1 = ey0 + dy;
+				int ex2 = ex1 + dx;
+				int ey2 = ey1 + dy;
+
+				ex1 = (ex1 < 0 || ex1 > region_map.cols - 1) ? ex0 : ex1;
+				ey1 = (ey1 < 0 || ey1 > region_map.rows - 1) ? ey0 : ey1;
+				ex2 = (ex2 < 0 || ex2 > region_map.cols - 1) ? ex1 : ex2;
+				ey2 = (ey2 < 0 || ey2 > region_map.rows - 1) ? ey1 : ey2;
+
+				tp.push_back(Point(ex0, ey0));
+				tp.push_back(Point(ex1, ey1));
+				tp.push_back(Point(ex2, ey2));
+
 				int find = 0;
+				int fr, tr;//from-region-number and to-region-number
 				for (int i = 0; i < edges.size(); i++)
 				{
-					ft = edges[i].getRegionNumbers();
+					fr = edges[i].getFromRegionNumber();
+					tr = edges[i].getToRegionNumber();
 					//找到edge，添加Points进去
-					if (ft[0] == f && ft[1] == t)
+					if (fr == f && tr == t)
 					{
-						edges[i].addPoints(Point(x, y), Point(ex, ey));
 						find = 1;
-						break;
+						edges[i].addPoints(fp, tp);
 					}
-					if (ft[0] == t && ft[1] == f)
+					if (fr == t && tr == f)
 					{
-						edges[i].addPoints(Point(ex, ey), Point(x, y));
 						find = 1;
-						break;
+						edges[i].addPoints(tp, fp);
 					}
 				}
 				//没有找到对应edge，新建edge
@@ -306,7 +338,7 @@ void addToEdge(Point p, Mat region_map, vector<Edge> &edges)
 				{
 					Edge e;
 					e.setRegions(f, t);
-					e.addPoints(Point(x, y), Point(ex, ey));
+					e.addPoints(fp, tp);
 					edges.push_back(e);
 				}
 				return;
@@ -422,12 +454,12 @@ int findBackground(vector<Region> &rs, Mat &region_show)
 
 void drawEdge(Edge e, Mat &gray, int c)
 {
-	vector<vector<Point>> pts = e.getPoints();
-	int const N = pts.size();
+	vector<vector<Point>> fpts = e.getFromRegionPoints();
+	int const N = fpts.size();
 
 	for (int i = 0; i < N; i++)
 	{
-		Point p = pts[i][0];
+		Point p = fpts[i][0];
 		circle(gray, p, 2, c);
 	}
 	waitKey();
@@ -436,69 +468,71 @@ void drawEdges(vector<Edge> es, Mat &gray)
 {
 	for (int i = 0; i < es.size(); i++)
 	{
-		drawEdge(es[i], gray, i * 50+5);
+		drawEdge(es[i], gray, i * 50 + 5);
 	}
 }
 float KEdge(Edge e, Mat gray)
 {
 
 	float k = 0;
-	vector<vector<Point>> pts = e.getPoints();
-	int const N = pts.size();
+	vector<vector<Point>> fpts = e.getFromRegionPoints();
+	vector<vector<Point>> tpts = e.getToRegionPoints();
+	int const N = fpts.size();
 	float K = 0;
-	int fn = e.getRegionNumbers()[0];
-	int tn = e.getRegionNumbers()[1];
+	int fn = e.getFromRegionNumber();
+	int tn = e.getToRegionNumber();
 	for (int i = 0; i < N; i++)
 	{
-		Point p = pts[i][0];
-		int FF = gray.at<uchar>(p.y, p.x);
-		float F = (float)gray.at<uchar>(pts[i][0]);
-		float T = (float)gray.at<uchar>(pts[i][1]);
-		K = K + (float)F / T;
+		for (int ii = 0; ii < EDGE_WIDTH; ii++)
+		{
+			float F = (float)gray.at<uchar>(fpts[i][ii]);
+			float T = (float)gray.at<uchar>(tpts[i][ii]);
+			K = K + (float)F / T;
+		}
 	}
 	Mat edg = gray.clone();
 	for (int i = 0; i < N; i++)
 	{
-		Point p = pts[i][0];
+		Point p = fpts[i][0];
 		circle(edg, p, 2, 0);
 	}
 	imshow("edge used to calculate K", edg);
 	//waitKey();
-	k = K / N;
-	cout << "K:" << k << endl;
+	k = K / EDGE_WIDTH / N;
+	std::cout << "K:" << k << endl;
 	return k;
 }
 void  mergeEdges(vector<Edge> &es)
 {
-	cout << "#####start merge edges####" << endl;
+	std::cout << "#####start merge edges####" << endl;
 	for (int i = 0; i < es.size(); i++)
 	{
-		cout << es[i].getRegionNumbers()[0] << ":" << es[i].getRegionNumbers()[1] << endl;
+		std::cout << es[i].getFromRegionNumber() << ":" << es[i].getToRegionNumber() << endl;
 	}
 	for (int i = 0; i < es.size(); i++)
 	{
-		vector<int> rsi = es[i].getRegionNumbers();
-		int fi = rsi[0];
-		int ti = rsi[1];
-		vector<vector<Point>> ppi = es[i].getPoints();
+		int fi = es[i].getFromRegionNumber();
+		int ti = es[i].getToRegionNumber();
+		vector<vector<Point>> fptsi = es[i].getFromRegionPoints();
+		vector<vector<Point>> tptsi = es[i].getToRegionPoints();
 		for (int j = 0; j < i; j++)
 		{
-			vector<int> rsj = es[j].getRegionNumbers();
-			int fj = rsj[0];
-			int tj = rsj[1];
+			int fj = es[j].getFromRegionNumber();
+			int tj = es[j].getToRegionNumber();
+
 			//if i-->j , merge i to j and erase i
 			if (fj == fi && tj == ti)
 			{
-				for (int p = 0; p < ppi.size(); p++)
+				for (int p = 0; p < fptsi.size(); p++)
 				{
-					es[j].addPoints(ppi[p][0], ppi[p][1]);
+					es[j].addPoints(fptsi[p], tptsi[p]);
 				}
 			}
 			if (fj == ti && tj == fi)
 			{
-				for (int p = 0; p < ppi.size(); p++)
+				for (int p = 0; p < fptsi.size(); p++)
 				{
-					es[j].addPoints(ppi[p][1], ppi[p][0]);
+					es[j].addPoints(tptsi[p], fptsi[p]);
 				}
 			}
 			if (fj == ti && tj == fi || fj == fi && tj == ti)
@@ -513,73 +547,13 @@ void  mergeEdges(vector<Edge> &es)
 	cout << "#####after merge edges####" << endl;
 	for (int i = 0; i < es.size(); i++)
 	{
-		cout << es[i].getRegionNumbers()[0] << ":" << es[i].getRegionNumbers()[1] << endl;
+		cout << es[i].getFromRegionNumber() << ":" << es[i].getToRegionNumber() << endl;
 	}
 	cout << "#####after merge edges####" << endl;
 }
-void _mergeEdges(vector<Edge> &es)
-{
-	cout << "#####start merge edges####" << endl;
-	for (int i = 0; i < es.size(); i++)
-	{
-		cout << es[i].getRegionNumbers()[0] << ":" << es[i].getRegionNumbers()[1] << endl;
-	}
-	vector<Edge> res;
-	int merge = 0;
-	for (int i = 0; i < es.size(); i++)
-	{
-		vector<int> rsi = es[i].getRegionNumbers();
-		int fi = rsi[0];
-		int ti = rsi[1];
-		merge = 0;
-		for (int j = 0; j < res.size(); j++)
-		{
-			vector<int> rsj = res[j].getRegionNumbers();
-			int fj = rsj[0];
-			int tj = rsj[1];
-			if (fj == fi && tj == ti)
-			{
-				vector<vector<Point>> ppi = es[i].getPoints();
-				for (int p = 0; p < ppi.size(); p++)
-				{
-					res[j].addPoints(ppi[p][0], ppi[p][j]);
-				}
-			}
-			if (fj == ti && tj == fi)
-			{
-				vector<vector<Point>> ppi = es[i].getPoints();
-				for (int p = 0; p < ppi.size(); p++)
-				{
-					res[j].addPoints(ppi[p][1], ppi[p][0]);
-				}
-			}
-			if (fj == ti && tj == fi || fj == fi && tj == ti)
-			{
-				cout << i << ":" << "fi:ti->fj:tj" << fi << ":" << ti << "->" << fj << ":" << tj << endl;
-				merge = 1;
-				vector<Edge>::iterator eit = es.begin();
-				es.erase(eit + i);
-				break;
-			}
-		}
-		if (0 == merge)
-		{
-			Edge esi = es[i];
-			res.push_back(esi);
-			vector<Edge>::iterator eit = es.begin();
-			es.erase(eit + i);
-		}
-	}
-	es = res;
-	cout << "#####after merge edges####" << endl;
-	for (int i = 0; i < es.size(); i++)
-	{
-		cout << es[i].getRegionNumbers()[0] << ":" << es[i].getRegionNumbers()[1] << endl;
-	}
-}
+
 void mergeRegions(vector<Region> &rs, vector<Edge> &es, Mat &mygray, Mat &region_map)
 {
-
 	for (int i = 0; i < es.size(); i++)
 	{//iterate the edges
 		Mat mg0 = mygray.clone();
@@ -591,9 +565,8 @@ void mergeRegions(vector<Region> &rs, vector<Edge> &es, Mat &mygray, Mat &region
 		waitKey();
 
 		//update regions besides to ei(merge)
-		vector<int> ft = ei.getRegionNumbers();
-		int f = ft[0];
-		int t = ft[1];
+		int f = ei.getFromRegionNumber();
+		int t = ei.getToRegionNumber();
 		//cout << i << ":fn-tn-k:" << f << "-" << t << "-" << k << endl;
 		int rt;
 		for (rt = 0; rt < rs.size(); rt++)
@@ -617,14 +590,15 @@ void mergeRegions(vector<Region> &rs, vector<Edge> &es, Mat &mygray, Mat &region
 		//update edges
 		for (int ii = 0; ii < es.size(); ii++)
 		{
-			vector<int> rn = es[ii].getRegionNumbers();
-			if (rn[0] == t)
+			int erf = es[ii].getFromRegionNumber();
+			int ert = es[ii].getToRegionNumber();
+			if (erf == t)
 			{
-				es[ii].setRegions(f, rn[1]);
+				es[ii].setRegions(f, ert);
 			}
-			if (rn[1] == t)
+			if (ert == t)
 			{
-				es[ii].setRegions(rn[0], f);
+				es[ii].setRegions(erf, f);
 			}
 		}
 		mergeEdges(es);
@@ -632,105 +606,6 @@ void mergeRegions(vector<Region> &rs, vector<Edge> &es, Mat &mygray, Mat &region
 	}
 }
 
-void _mergeRegions(vector<Region> &rs, vector<Edge> &es, Mat &mygray, Mat &region_map)
-{
-	Mat mg0 = mygray.clone();
-	cout << "start merge regions" << endl;
-	drawEdges(es, mg0);
-
-	int region_size = rs.size();
-	for (int from = 0; from < region_size; from++)
-	{//for all regions
-		//In fact this loop should be runed for only once, for the reason that 
-		//the from region will be extend until all regions is included
-		//but in case of some independent regions
-
-		if (rs[from].isBackground())
-			//ignore background region
-			continue;
-
-		Region &rf = rs[from];
-		int fn = rs[from].getRegionNum();
-		//mergeEdges(es);
-		//find neighbour region by edges
-		for (int e = 0; e < es.size(); e++)
-		{
-			cout << "### " << endl << endl;
-			for (int etest = 0; etest < es.size(); etest++)
-			{
-				vector<int> rtests = es[etest].getRegionNumbers();
-				cout << "edge " << etest << ":" << rtests[0] << ":" << rtests[1] << endl;
-			}
-			vector<int> ft = es[e].getRegionNumbers();
-			if ((ft[0] == fn || ft[1] == fn) && (ft[0] != ft[1]))
-			{
-
-				//find neighbour
-				float k = KEdge(es[e], mygray);
-				int tn = ft[1];
-				if (ft[1] == fn)
-				{
-					k = 1 / k;
-					tn = ft[0];
-				}
-				cout << e << ":fn-tn-k:" << fn << "-" << tn << "-" << k << endl;
-				//merge tn to fn
-				//update the gray img
-				//find the region of  tn
-				int to = 0;
-				for (int i = 0; i < rs.size(); i++)
-				{
-					if (rs[i].getRegionNum() == tn)
-					{
-						to = i;
-						break;
-					}
-				}
-
-				vector<Point> tpts = rs[to].getPoints();
-				for (int i = 0; i < tpts.size(); i++)
-				{
-					float old_t = (float)mygray.at<uchar>(tpts[i]);
-					float new_t = old_t * k;
-					mygray.at<uchar>(tpts[i]) = (uchar)(new_t);
-					region_map.at<uchar>(tpts[i]) = (uchar)fn;
-				}
-
-				//remove region of tn
-				vector<Region>::iterator rit = rs.begin();
-				rs.erase(rit + to);
-
-				//remove edge
-				vector<Edge>::iterator it = es.begin();
-				es.erase(it + e);
-
-				//update edges, change all of tn to fn
-				for (int i = 0; i < es.size(); i++)
-				{
-					vector<int> rn = es[i].getRegionNumbers();
-					if (rn[0] == tn)
-					{
-						es[i].setRegions(fn, rn[1]);
-					}
-					if (rn[1] == tn)
-					{
-						es[i].setRegions(rn[0], fn);
-					}
-				}
-				mergeEdges(es);
-
-				//restart from the begining.
-				e = 0;
-				Mat mg = mygray.clone();
-				cout << "merging" << endl;
-				drawEdges(es,mg);
-				imshow("mygray_test", mygray);
-				waitKey();
-			}//if ((ft[0] == fn || ft[1] == fn) && (ft[0]!=ft[1]))
-		}//for (int e = 0; e < es.size(); e++)
-		region_size = rs.size();
-	}//for (int from = 0; from < region_size; from++)
-}
 int findMin(int a, int b, int c)
 {
 	int r = a;
@@ -794,7 +669,7 @@ void _main()
 }
 void main()
 {
-	Mat img = imread("cn.jpg");
+	Mat img = imread("c.jpg");
 	Mat region_map, region_show, gray;
 	cvtColor(img, region_map, CV_RGB2GRAY);
 	cvtColor(img, region_show, CV_RGB2GRAY);
@@ -830,8 +705,9 @@ void main()
 	vector<Edge>::iterator ie = edges.begin();
 	for (; ie != edges.end();)
 	{
-		vector<int> ers = ie->getRegionNumbers();
-		if (ers[0] == bg || ers[1] == bg)
+		int erf = ie->getFromRegionNumber();
+		int ert = ie->getToRegionNumber();
+		if (erf == bg || ert == bg)
 		{
 			ie = edges.erase(ie);
 		}
