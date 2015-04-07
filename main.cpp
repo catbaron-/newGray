@@ -491,7 +491,7 @@ void  mergeEdges(vector<Edge> &es)
 			{
 				for (int p = 0; p < ppi.size(); p++)
 				{
-					es[j].addPoints(ppi[p][0], ppi[p][j]);
+					es[j].addPoints(ppi[p][0], ppi[p][1]);
 				}
 			}
 			if (fj == ti && tj == fi)
